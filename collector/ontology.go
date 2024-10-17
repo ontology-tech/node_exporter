@@ -32,8 +32,8 @@ import (
 var ontologyRpc = kingpin.Flag("collector.ontology.rpc", "specify ontology node rpc target, default to http://127.0.0.1:20336").Default("http://127.0.0.1:20336").String()
 
 type ontologyCollector struct {
-	height typedDesc
-	logger log.Logger
+	height  typedDesc
+	logger  log.Logger
 }
 
 func init() {
@@ -48,7 +48,7 @@ func NewOntologyCollector(logger log.Logger) (Collector, error) {
 		height: typedDesc{prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, subsystem, "height"),
 			"ontology blockchain consensus node height",
-			nil, nil,
+			[]string{"version"}, nil,
 		), prometheus.GaugeValue},
 		logger: logger,
 	}, nil
@@ -60,6 +60,39 @@ type OntologyHeightResp struct {
 	ID      string `json:"id"`
 	Jsonrpc string `json:"jsonrpc"`
 	Result  uint64 `json:"result"`
+}
+
+
+type OntologyVersionResp struct {
+	Desc    string `json:"desc"`
+	Error   int    `json:"error"`
+	ID      string `json:"id"`
+	Jsonrpc string `json:"jsonrpc"`
+	Result  string `json:"result"`
+}
+
+func getVersion() (string, error) {
+	ctx, cf := context.WithTimeout(context.Background(), time.Second*3)
+	defer cf()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, *ontologyRpc, strings.NewReader(`{"jsonrpc":"2.0","id":"1","method":"getversion","params":[]}`))
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+
+	defer resp.Body.Close()
+
+	var r OntologyVersionResp
+	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
+		return "", err
+	}
+
+	return r.Result, nil
 }
 
 func getHeight() (uint64, error) {
@@ -94,9 +127,14 @@ func (c *ontologyCollector) Update(ch chan<- prometheus.Metric) error {
 		ch <- c.height.mustNewConstMetric(float64(0.0))
 		return err
 	}
+	
+	version, err := getVersion()
+	if err != nil {
+		return err
+	}
 
-	level.Debug(c.logger).Log("target", *ontologyRpc, "hight", height)
-	ch <- c.height.mustNewConstMetric(float64(height))
+	level.Debug(c.logger).Log("target", *ontologyRpc, "hight", height, "version", version)
+	ch <- c.height.mustNewConstMetric(float64(height), version)
 
 	return nil
 }
