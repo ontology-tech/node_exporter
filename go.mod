@@ -1,6 +1,8 @@
 module github.com/prometheus/node_exporter
 
-go 1.22.0
+go 1.22.5
+
+//go 1.22.0
 
 require (
 	github.com/alecthomas/kingpin/v2 v2.4.0
@@ -29,6 +31,7 @@ require (
 	github.com/prometheus/procfs v0.15.1
 	github.com/safchain/ethtool v0.4.1
 	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0
+	golang.org/x/net v0.29.0
 	golang.org/x/sys v0.25.0
 	howett.net/plist v1.0.1
 )
@@ -52,7 +55,6 @@ require (
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	golang.org/x/crypto v0.27.0 // indirect
-	golang.org/x/net v0.29.0 // indirect
 	golang.org/x/oauth2 v0.23.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
 	golang.org/x/text v0.18.0 // indirect

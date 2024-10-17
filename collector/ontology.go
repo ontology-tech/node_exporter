@@ -18,22 +18,27 @@ package collector
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/alecthomas/kingpin/v2"
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/net/context"
+)
+
+const (
+	// if anything failed, we push metric of height 0.0, version 0.0 to prom, some alert rule can be created by this value accordingly
+	badVersion string  = "0.0"
+	badHeight  float64 = 0.0
 )
 
 var ontologyRpc = kingpin.Flag("collector.ontology.rpc", "specify ontology node rpc target, default to http://127.0.0.1:20336").Default("http://127.0.0.1:20336").String()
 
 type ontologyCollector struct {
-	height  typedDesc
-	logger  log.Logger
+	height typedDesc
+	logger *slog.Logger
 }
 
 func init() {
@@ -42,7 +47,7 @@ func init() {
 
 // NewTimeCollector returns a new Collector exposing the current system time in
 // seconds since epoch.
-func NewOntologyCollector(logger log.Logger) (Collector, error) {
+func NewOntologyCollector(logger *slog.Logger) (Collector, error) {
 	const subsystem = "consensus"
 	return &ontologyCollector{
 		height: typedDesc{prometheus.NewDesc(
@@ -61,7 +66,6 @@ type OntologyHeightResp struct {
 	Jsonrpc string `json:"jsonrpc"`
 	Result  uint64 `json:"result"`
 }
-
 
 type OntologyVersionResp struct {
 	Desc    string `json:"desc"`
@@ -124,17 +128,33 @@ func (c *ontologyCollector) Update(ch chan<- prometheus.Metric) error {
 	height, err := getHeight()
 	if err != nil {
 		// let alert manager detect this error
-		ch <- c.height.mustNewConstMetric(float64(0.0))
-		return err
-	}
-	
-	version, err := getVersion()
-	if err != nil {
+		ch <- c.height.mustNewConstMetric(badHeight, badVersion)
 		return err
 	}
 
-	level.Debug(c.logger).Log("target", *ontologyRpc, "hight", height, "version", version)
-	ch <- c.height.mustNewConstMetric(float64(height), version)
+	version, err := getVersion()
+	if err != nil {
+		// let alert manager detect this error
+		ch <- c.height.mustNewConstMetric(badHeight, badVersion)
+		return err
+	}
+
+	c.logger.Debug("ontology node collector", slog.Attr{
+		Key:   "rpc",
+		Value: slog.StringValue(*ontologyRpc),
+	}, slog.Attr{
+		Key:   "height",
+		Value: slog.Uint64Value(height),
+	}, slog.Attr{
+		Key:   "version",
+		Value: slog.StringValue(version),
+	})
+
+	if m, err := prometheus.NewConstMetric(c.height.desc, c.height.valueType, float64(height), version); err == nil {
+		ch <- m
+	} else {
+		ch <- c.height.mustNewConstMetric(badHeight, badVersion)
+	}
 
 	return nil
 }
