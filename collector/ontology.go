@@ -34,7 +34,7 @@ const (
 	badHeight  float64 = 0.0
 )
 
-var ontologyRpc = kingpin.Flag("collector.ontology.rpc", "specify ontology node rpc target, default to http://127.0.0.1:20336").Default("http://127.0.0.1:20336").String()
+var ontologyRpc = kingpin.Flag("collector.ontology.rpc", "specify ontology node rpc target, default to http://127.0.0.1:40336").Default("http://127.0.0.1:40336").String()
 
 type ontologyCollector struct {
 	height typedDesc
@@ -48,11 +48,11 @@ func init() {
 // NewTimeCollector returns a new Collector exposing the current system time in
 // seconds since epoch.
 func NewOntologyCollector(logger *slog.Logger) (Collector, error) {
-	const subsystem = "consensus"
+	const subsystem = "testnet"
 	return &ontologyCollector{
 		height: typedDesc{prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, subsystem, "height"),
-			"ontology blockchain consensus node height",
+			"ontology testnet blockchain consensus node height",
 			[]string{"version"}, nil,
 		), prometheus.GaugeValue},
 		logger: logger,
